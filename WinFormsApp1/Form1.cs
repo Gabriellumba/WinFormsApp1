@@ -66,6 +66,10 @@ namespace WinFormsApp1
 
         }
 
-        
+        // Add this method to handle the TextChanged event for textBox1
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+            // You can leave this empty or add logic as needed
+        }
     }
 }
