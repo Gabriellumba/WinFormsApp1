@@ -144,6 +144,9 @@ namespace WinFormsApp1
                 {"hello", new string[] { "Hi there, {name}!", "Hello {name}!", "Greetings, {name}!" } },
                 {"hi", new string[] { "Hello {name}!", "Hi {name}!", "Hey there, {name}!" } },
                 {"my name is ", new string[] { "Nice to meet you, {name}!", "Hello {name}, welcome!", "Greetings, {name}!" } },
+                {"i am ", new string[] { "Nice to meet you, {name}!", "Hello {name}, welcome!", "Greetings, {name}!" } },
+                {"i'm ", new string[] { "Nice to meet you, {name}!", "Hello {name}, welcome!", "Greetings, {name}!" } },
+                {"call me ", new string[] { "Nice to meet you, {name}!", "Hello {name}, welcome!", "Greetings, {name}!" } },
                 {"thanks", new string[] { "You're welcome ! and how can I help you with ? , {name}!" } },
                 {"how are you", new string[] { "I'm good, thank you {name}!", "Doing well, how about you {name}?", "I'm fine, thanks for asking {name}!" } },
                 {"i'm good,too", new string[] { "That's great to hear, {name}!", "I'm glad you're doing well, {name}!", "Awesome, {name}!" } },
@@ -209,14 +212,28 @@ namespace WinFormsApp1
         /// </summary>
         private void ProcessInitialGreeting(string userinput)
         {
-            // Check if user is providing their name in the first message
-            if (userinput.Contains("my name is "))
+            // Check if user is providing their name in various formats
+            if (ContainsNameIndicator(userinput))
             {
                 ExtractAndSetUserName(userinput);
-                nameAsked = true;
-                ShowProcessingIndicator();
-                string matchedKey = "my name is ";
-                QueueChatbotResponse(matchedKey);
+                
+                // Only proceed if name was successfully extracted
+                if (!string.IsNullOrEmpty(userName))
+                {
+                    nameAsked = true;
+                    ShowProcessingIndicator();
+                    
+                    // Use the appropriate keyword based on what the user said
+                    string matchedKey = FindNameIndicatorKeyword(userinput);
+                    QueueChatbotResponse(matchedKey);
+                }
+                else
+                {
+                    // Name extraction failed, ask again
+                    ShowProcessingIndicator();
+                    pendingResponse = "I didn't quite catch your name. Could you please tell me your name?";
+                    processingTimer.Start();
+                }
             }
             else
             {
@@ -245,16 +262,54 @@ namespace WinFormsApp1
         }
 
         /// <summary>
+        /// Checks if the user input contains name indicators
+        /// </summary>
+        private bool ContainsNameIndicator(string userinput)
+        {
+            // Check for various ways users might provide their name
+            return userinput.Contains("my name is ") ||
+                   userinput.Contains("i am ") ||
+                   userinput.Contains("i'm ") ||
+                   userinput.Contains("call me ");
+        }
+
+        /// <summary>
+        /// Finds which name indicator keyword is present in the user input
+        /// </summary>
+        private string FindNameIndicatorKeyword(string userinput)
+        {
+            if (userinput.Contains("my name is "))
+                return "my name is ";
+            else if (userinput.Contains("i am "))
+                return "i am ";
+            else if (userinput.Contains("i'm "))
+                return "i'm ";
+            else if (userinput.Contains("call me "))
+                return "call me ";
+            
+            return "my name is "; // Default fallback
+        }
+
+        /// <summary>
         /// Processes regular user input after initial greeting - matches keywords and generates response
         /// </summary>
         private void ProcessUserInput(string userinput)
         {
-            // Check if user is providing their name
-            if (userinput.Contains("my name is "))
+            // Check if user is providing their name in any format
+            if (ContainsNameIndicator(userinput))
             {
                 ExtractAndSetUserName(userinput);
-                string matchedKey = "my name is ";
-                QueueChatbotResponse(matchedKey);
+                
+                if (!string.IsNullOrEmpty(userName))
+                {
+                    string matchedKey = FindNameIndicatorKeyword(userinput);
+                    QueueChatbotResponse(matchedKey);
+                }
+                else
+                {
+                    pendingResponse = "I didn't catch that. Could you please repeat your name?";
+                    processingTimer.Start();
+                }
             }
             // First, try exact match
             else if (_chatbotbrain.ContainsKey(userinput)) 
@@ -315,7 +370,7 @@ namespace WinFormsApp1
         /// </summary>
         private void ShowProcessingIndicator()
         {
-            if (string.IsNullOrEmpty(conversationHistory.Count > 0 ? conversationHistory.Last().Message : ""))
+            if (conversationHistory.Count == 0 || (!string.IsNullOrEmpty(conversationHistory.Last().Message) && conversationHistory.Last().Message != "Chatbot is typing..."))
             {
                 // Add processing indicator to the conversation
                 conversationHistory.Add(("Chatbot", "Chatbot is typing..."));
@@ -336,13 +391,40 @@ namespace WinFormsApp1
         }
 
         /// <summary>
-        /// Extracts the user's name from a message containing "my name is"
+        /// Extracts the user's name from various message formats
         /// </summary>
         private void ExtractAndSetUserName(string userInput)
         {
-            const string namePrefix = "my name is ";
+            string namePrefix = "";
+            
+            // Determine which prefix to use
+            if (userInput.Contains("my name is "))
+                namePrefix = "my name is ";
+            else if (userInput.Contains("i am "))
+                namePrefix = "i am ";
+            else if (userInput.Contains("i'm "))
+                namePrefix = "i'm ";
+            else if (userInput.Contains("call me "))
+                namePrefix = "call me ";
+            else
+                return;
+            
+            // Extract name after the prefix
             int startIndex = userInput.IndexOf(namePrefix) + namePrefix.Length;
-            userName = userInput.Substring(startIndex).Trim();
+            
+            if (startIndex < userInput.Length)
+            {
+                string extractedName = userInput.Substring(startIndex).Trim();
+                
+                // Remove any punctuation from the end
+                extractedName = extractedName.TrimEnd('.', ',', '!', '?');
+                
+                // Only set the name if it's not empty and contains actual characters
+                if (!string.IsNullOrEmpty(extractedName) && extractedName.Length > 1)
+                {
+                    userName = extractedName;
+                }
+            }
         }
 
         /// <summary>
